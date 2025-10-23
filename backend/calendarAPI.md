@@ -1,58 +1,32 @@
 ```mermaid
 sequenceDiagram
-    participant U as ユーザー（ブラウザ操作）
-    participant B as Flaskバックエンド
-    participant GAuth as Google OAuthサーバー
-    participant GCal as Google Calendar API
-
-    U->>GAuth: ① GET /auth<br>（Google認可画面へリダイレクト要求）
-    GAuth-->>U: Googleログイン画面＋同意画面表示
-    U-->>GAuth: 同意を許可
-    GAuth-->>B: ② GET /oauth2callback?code=...<br>（認可コード付与）
-    B->>GAuth: ③ POST /token<br>（code, client_id, secret, redirect_uri）
-    GAuth-->>B: access_token, refresh_token 返却
-    B->>GCal: ④ GET /calendar/v3/calendars/primary/events<br>Authorization: Bearer access_token
-    GCal-->>B: カレンダーイベント（JSON）
-    B-->>U: 整形されたレスポンスを返す（例: JSON一覧）
-```
-
-// filepath: /Users/sakaikanji/Documents/Calendar/backend/calendarAPI.md
-```mermaid
-sequenceDiagram
     autonumber
     participant U as ユーザー（ブラウザ）
     participant F as フロントエンド
     participant B as Flaskバックエンド
     participant G as Google OAuthサーバー
 
-    U->>F: ① 「Googleでログイン」ボタン押下 (GET /api/auth)
-    F->>B: ② リクエスト転送 (Proxy)
-    B-->>F: ③ 302 Redirect (Location: https://accounts.google.com/...)
-    F-->>U: ブラウザがLocationへ遷移
-    U->>G: ④ GET /o/oauth2/v2/auth?...
-    G-->>U: ⑤ 同意画面
-    U-->>G: ⑥ 同意送信
-    G-->>U: ⑦ 302 Redirect (Location: http://127.0.0.1:3000/oauth2callback?code=...&state=...)
-    U->>B: ⑧ GET /oauth2callback?code=...&state=...
-    B->>G: ⑨ POST /token (code 等)
-    G-->>B: ⑩ access_token / refresh_token
-    B-->>F: ⑪ 302 Redirect (Location: http://localhost:5173/post-auth)
-    F-->>U: ⑫ 完了画面
-```
-```mermaid
-sequenceDiagram
-    participant U as ユーザー
-    participant B as Flask
-    participant GAuth as Google OAuth
-    participant GCal as Google Calendar API
+    %% --- 認証開始 ---
+    U->>F: ① GET /api/auth HTTP/1.1<br>Host: localhost:5173
+    F->>B: ② GET /api/auth HTTP/1.1<br>Host: localhost:3000<br>（Proxy転送）
+    B-->>F: ③ HTTP/1.1 302 Found<br>Location: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=http://127.0.0.1:3000/oauth2callback&scope=...&response_type=code
+    F-->>U: ③' HTTP/1.1 302 Found<br>Location: https://accounts.google.com/o/oauth2/v2/auth?...
 
-    U->>GAuth: 認可画面要求
-    GAuth-->>U: ログイン＋同意画面
-    U-->>GAuth: 同意
-    GAuth-->>B: GET /oauth2callback?code=...
-    B->>GAuth: POST /token
-    GAuth-->>B: トークン返却
-    B->>GCal: GET /calendar/v3/... (Bearer access_token)
-    GCal-->>B: イベントJSON
-    B-->>U: 整形レスポンス
-```
+    %% --- Googleログイン画面へ遷移 ---
+    U->>G: ④ GET /o/oauth2/v2/auth?... HTTP/1.1<br>Host: accounts.google.com
+    G-->>U: ⑤ HTTP/1.1 200 OK<br>Content-Type: text/html<br>（Googleログイン・同意画面）
+
+    %% --- 同意送信 ---
+    U-->>G: ⑥ POST /signin/v2/challenge/... HTTP/1.1<br>Cookie: ...<br>Body: consent=allow
+    G-->>U: ⑦ HTTP/1.1 302 Found<br>Location: http://127.0.0.1:3000/oauth2callback?code=abcd1234&state=xyz
+
+    %% --- 認可コード受取 ---
+    U->>B: ⑧ GET /oauth2callback?code=abcd1234&state=xyz HTTP/1.1<br>Host: localhost:3000
+    B->>G: ⑨ POST /token HTTP/1.1<br>Host: oauth2.googleapis.com<br>Content-Type: application/x-www-form-urlencoded<br>Body: code=abcd1234&client_id=...&client_secret=...&redirect_uri=...&grant_type=authorization_code
+    G-->>B: ⑩ HTTP/1.1 200 OK<br>Content-Type: application/json<br>{"access_token": "...", "refresh_token": "...", "expires_in": 3600}
+
+    %% --- 認証後のリダイレクト ---
+    B-->>U: ⑪ HTTP/1.1 302 Found<br>Location: http://localhost:5173/post-auth
+    U->>F: ⑫ GET /post-auth HTTP/1.1<br>Host: localhost:5173
+    F-->>U: ⑬ HTTP/1.1 200 OK<br>Content-Type: text/html<br>（完了画面を表示）
+    
