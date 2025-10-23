@@ -1,20 +1,54 @@
 import React, { useState } from 'react';
 import { Send, Calendar, Zap } from 'lucide-react';
 
+interface Message {
+  date: string;
+  timestamp: string;
+}
+
 export default function CheckTheDay() {
   const [selectedDate, setSelectedDate] = useState('');
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string|null>(null);
+  const handleAuthRedirect = () => {
+    // TODO: 認可URL取得後にリダイレクト処理を実装
+    // 例: window.location.href = authUrl;
+  };
 
-  const handleSubmit = () => {
-    if (!selectedDate) return;
-    
-    const newMessage = {
-      date: selectedDate,
-      timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  // API logic here
+  const handleSubmit = async() => {
+    if (!selectedDate || sending) return;
+    setSending(true); 
+    setError(null);
+
+    // 極力 /api を使う（vite の proxy が 3000 に転送）
+    try {
+      const res = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: selectedDate })
+      });
+
+
+      if (res.status === 401) {
+        const { auth_url } = await res.json();
+        window.location.href = auth_url;
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      // 返却ペイロードは { date: string; timestamp: string } を想定
+      setMessages(prev => [...prev, payload]); // ←関数形式で競合を回避
+      setSelectedDate('');
+    } catch (e: any) {
+      setError(e.message ?? '送信に失敗しました');
+    } finally {
+      setSending(false);
     };
-    
-    setMessages([...messages, newMessage]);
-    setSelectedDate('');
+
+  // ...（JSX は既存のまま）
   };
 
   return (
@@ -34,7 +68,7 @@ export default function CheckTheDay() {
             </h1>
             <Zap className="w-8 h-8 text-purple-400" />
           </div>
-          <p className="text-gray-400 text-lg">未来の日付をチェック</p>
+          <p className="text-gray-400 text-lg">予定をチェック</p>
         </div>
 
         {/* メインカード */}
