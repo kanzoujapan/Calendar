@@ -11,9 +11,10 @@ export default function CheckTheDay() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string|null>(null);
+  
+  //フルリダイレクトで認可開始
   const handleAuthRedirect = () => {
-    // TODO: 認可URL取得後にリダイレクト処理を実装
-    // 例: window.location.href = authUrl;
+    window.location.assign('/api/auth'); //302 locationをブラウザが追従してGoogleへ
   };
 
   // API logic here
@@ -30,7 +31,7 @@ export default function CheckTheDay() {
         body: JSON.stringify({ date: selectedDate })
       });
 
-
+      // 認可エラー
       if (res.status === 401) {
         const { auth_url } = await res.json();
         window.location.href = auth_url;
@@ -111,8 +112,9 @@ export default function CheckTheDay() {
               className="px-8 py-4 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 rounded-xl transition-all flex items-center gap-2 text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-xl hover:shadow-cyan-500/50 group border border-cyan-400/30"
             >
               <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              SEND
+              {sending ? 'SENDING...' : 'SEND'}
             </button>
+            <button onClick={handleAuthRedirect} className="px-4 py-2 border rounded-lg text-cyan-300">Sign in</button>
           </div>
         </div>
 
