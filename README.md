@@ -85,3 +85,15 @@ google calendar API との通信の実装中
 次は
 google calendar にアクセスできるようにするまで
 tokenとかの話を解決
+
+## データベース
+```mysql
+CREATE TABLE google_tokens (
+  user_id       VARCHAR(255) PRIMARY KEY,
+  access_token  TEXT        NOT NULL,
+  refresh_token TEXT,
+  expires_at    DATETIME    NOT NULL,  -- UTC推奨
+  updated_at    DATETIME    DEFAULT CURRENT_TIMESTAMP
+                               ON UPDATE CURRENT_TIMESTAMP
+);
+```
