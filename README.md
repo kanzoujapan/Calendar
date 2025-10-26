@@ -85,3 +85,20 @@ google calendar API との通信の実装中
 次は
 google calendar にアクセスできるようにするまで
 tokenとかの話を解決
+
+## データベース
+
+- google calendar events db
+
+
+| 列名             | 型              | 制約・デフォルト値                                     | 説明 |
+|------------------|-----------------|--------------------------------------------------------|------|
+| user_id          | VARCHAR(255)    | NOT NULL                                               | ユーザーID（主キーの一部） |
+| google_event_id  | VARCHAR(255)    | NOT NULL                                               | GoogleイベントID（主キーの一部） |
+| event_date       | DATE            | NOT NULL                                               | 検索用の基準日（JSTで丸めて格納） |
+| title            | VARCHAR(255)    | NOT NULL                                               | イベントのタイトル（原則 summary） |
+| description      | TEXT            | NULL                                                   | イベント説明（空でも可） |
+| raw_json         | JSON            | NULL                                                   | 追加情報（JSON形式で格納） |
+| updated_at       | DATETIME        | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP  | 最終更新時刻 |
+| **PRIMARY KEY**  | (user_id, google_event_id) |                                             | 複合主キー |
+| **INDEX**        | idx_user_date (user_id, event_date) |                                    | user_id と event_date の複合インデックス |
