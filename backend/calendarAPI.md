@@ -1,32 +1,32 @@
 ```mermaid
 sequenceDiagram
     autonumber
+
     participant U as ユーザー（ブラウザ）
-    participant F as フロントエンド
-    participant B as Flaskバックエンド
-    participant G as Google OAuthサーバー
+    participant GAuth as Google認可サーバー
+    participant B as あなたのバックエンド（Flaskなど）
 
-    %% --- 認証開始 ---
-    U->>F: ① GET /api/auth HTTP/1.1<br>Host: localhost:5173
-    F->>B: ② GET /api/auth HTTP/1.1<br>Host: localhost:3000<br>（Proxy転送）
-    B-->>F: ③ HTTP/1.1 302 Found<br>Location: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=http://127.0.0.1:3000/oauth2callback&scope=...&response_type=code
-    F-->>U: ③' HTTP/1.1 302 Found<br>Location: https://accounts.google.com/o/oauth2/v2/auth?...
+    %% ① 認可リクエスト
+    U->>B: ① GET /auth （認可開始要求）
+    B-->>U: ② リダイレクトレスポンス<br>Location: https://accounts.google.com/o/oauth2/v2/auth?...
 
-    %% --- Googleログイン画面へ遷移 ---
-    U->>G: ④ GET /o/oauth2/v2/auth?... HTTP/1.1<br>Host: accounts.google.com
-    G-->>U: ⑤ HTTP/1.1 200 OK<br>Content-Type: text/html<br>（Googleログイン・同意画面）
+    %% ② Google認可画面表示
+    U->>GAuth: ③ GET /o/oauth2/v2/auth?client_id=...&redirect_uri=...
+    GAuth-->>U: ④ Googleログイン＋同意画面を表示
 
-    %% --- 同意送信 ---
-    U-->>G: ⑥ POST /signin/v2/challenge/... HTTP/1.1<br>Cookie: ...<br>Body: consent=allow
-    G-->>U: ⑦ HTTP/1.1 302 Found<br>Location: http://127.0.0.1:3000/oauth2callback?code=abcd1234&state=xyz
+    %% ③ ユーザーが許可を押す
+    U-->>GAuth: ⑤ 「許可する」ボタン押下（フォーム送信）
 
-    %% --- 認可コード受取 ---
-    U->>B: ⑧ GET /oauth2callback?code=abcd1234&state=xyz HTTP/1.1<br>Host: localhost:3000
-    B->>G: ⑨ POST /token HTTP/1.1<br>Host: oauth2.googleapis.com<br>Content-Type: application/x-www-form-urlencoded<br>Body: code=abcd1234&client_id=...&client_secret=...&redirect_uri=...&grant_type=authorization_code
-    G-->>B: ⑩ HTTP/1.1 200 OK<br>Content-Type: application/json<br>{"access_token": "...", "refresh_token": "...", "expires_in": 3600}
+    %% ④ Googleがリダイレクトを指示
+    GAuth-->>U: ⑥ 302 Redirect<br>Location: http://localhost:3000/oauth2callback?code=abcd1234&state=xyz
+    U->>B: ⑦ GET /oauth2callback?code=abcd1234 （ブラウザが自動アクセス）
 
-    %% --- 認証後のリダイレクト ---
-    B-->>U: ⑪ HTTP/1.1 302 Found<br>Location: http://localhost:5173/post-auth
-    U->>F: ⑫ GET /post-auth HTTP/1.1<br>Host: localhost:5173
-    F-->>U: ⑬ HTTP/1.1 200 OK<br>Content-Type: text/html<br>（完了画面を表示）
-    
+    %% ⑤ トークン交換（サーバー間通信）
+    B->>GAuth: ⑧ POST /token<br>（code, client_id, client_secret, redirect_uri, grant_type）
+    GAuth-->>B: ⑨ access_token, refresh_token を返却（JSON）
+
+    %% ⑥ APIアクセス
+    B->>GAuth: ⑩ GET /calendar/v3/...<br>Authorization: Bearer access_token
+    GAuth-->>B: ⑪ イベントデータ返却（JSON）
+    B-->>U: ⑫ 整形済みレスポンスを返す
+```
