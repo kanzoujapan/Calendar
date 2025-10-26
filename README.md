@@ -90,6 +90,7 @@ tokenとかの話を解決
 
 - google calendar events db
 
+```
    | 列名             | 型              | 制約・デフォルト値                                     | 説明 |
 |------------------|-----------------|--------------------------------------------------------|------|
 | user_id          | VARCHAR(255)    | NOT NULL                                               | ユーザーID（主キーの一部） |
@@ -101,3 +102,4 @@ tokenとかの話を解決
 | updated_at       | DATETIME        | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP  | 最終更新時刻 |
 | **PRIMARY KEY**  | (user_id, google_event_id) |                                                    | 複合主キー |
 | **INDEX**        | idx_user_date (user_id, event_date) |                                        | user_id と event_date の複合インデックス |
+```
