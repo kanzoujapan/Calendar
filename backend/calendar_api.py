@@ -1,6 +1,9 @@
-from flask import jsonify, Blueprint, request, redirect
+from flask import jsonify, Blueprint, request, redirect, session
+import requests
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from db import db
+from db.models import GoogleToken
 import zoneinfo
 import os 
 from dotenv import load_dotenv
@@ -8,6 +11,75 @@ from dotenv import load_dotenv
 load_dotenv()
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+
+
+def refresh_access_token(user_id):
+    token_url = "https://oauth2.googleapis.com/token"
+    user_info = GoogleToken.query.get(user_id)
+    if not user_info or not user_info.refresh_token:
+        raise RuntimeError("No refresh_token. Re-consent needed.")
+
+    refresh_token_data = {
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+        "refresh_token": user_info.refresh_token,
+        "grant_type": "refresh_token"
+    }
+
+    response = requests.post(token_url, data = refresh_token_data, timeout = 15)
+    response.raise_for_status()
+    payload = response.json()
+
+    new_access_token = payload.get("access_token")
+    expires_in = payload.get("expires_in", 3600)
+
+    if not new_access_token or not expires_in:
+        raise RuntimeError("Failed to refresh access token.")
+    
+    exp_utc = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    session["google_access_token"] = new_access_token
+    session["google_access_token_exp"] = exp_utc.isoformat()
+
+
+    user_info.expires_at = exp_utc
+    db.session.commit()
+
+    return new_access_token
+
+
+def get_valid_access_token():
+    user_id = session.get("google_user_id")
+    if not user_id:
+        raise RuntimeError("Not authenticated user.")
+    
+    token = session.get("google_access_token")
+    exp_iso = session.get("google_access_token_exp")
+
+    if token and exp_iso:
+        try:
+            exp_dt = datetime.fromisoformat(exp_iso)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            exp_dt = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+        if exp_dt > datetime.now(timezone.utc) + timedelta(seconds=30):
+            return token
+        
+
+    return refresh_access_token(user_id)
+
+
+    
+
+    
+
+
+
+
+
 
 # from front to GET /api/auth 
 # redirect to Endpoint to initiate Google Oauth2 authentication
