@@ -1,11 +1,9 @@
-from flask import jsonify, Blueprint, request, redirect, session
-import requests
-import urllib.parse
+from flask import jsonify, Blueprint, request, redirect, session, current_app
+import requests, urllib.parse, os
 from datetime import datetime, timedelta, timezone
 from db import db
 from db.models import GoogleToken
-import zoneinfo
-import os 
+import zoneinfo 
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -92,7 +90,7 @@ def auth():
         "response_type": "code",
         "client_id": client_id,
         "redirect_uri": redirect_uri,
-        "scope": "https://www.googleapis.com/auth/calendar.readonly", #将来的には.eventsにしてイベントの書き込みなども可能にするかもしれない
+        "scope": "openid email https://www.googleapis.com/auth/calendar.readonly", #将来的には.eventsにしてイベントの書き込みなども可能にするかもしれない
         "access_type": "offline",
         "include_granted_scopes": "true",
         "state": "xyz123"  # 任意のCSRF対策用トークン
@@ -123,6 +121,47 @@ def authentication_callback():
     response = requests.post(token_url, data = sendData)
     token_response_data = response.json()
     access_token = token_response_data.get("access_token")
+    refresh_token = token_response_data.get("refresh_token")
+    expires_in = token_response_data.get("expires_in", 3600)
+
+    if not access_token:
+        current_app.logger.error(f"No access_token in token response: {token_response_data}")
+        return jsonify({"error": "token_exchange_failed"}), 400
+
+    user_google_info = requests.get(
+        "https://openidconnect.googleapis.com/v1/userinfo",
+        headers = {"Authorization": f"Bearer {access_token}"}   
+    ).json()
+
+
+    user_id = user_google_info.get("sub")
+
+    if not user_id:
+        current_app.logger.error(f"userinfo missing 'sub': {user_google_info}")
+        return jsonify({"error": "missing_sub"}), 400
+
+    exp_utc = datetime.now(timezone.utc) + timedelta(seconds= expires_in)
+    session["google_access_token"] = access_token
+    session["google_user_id"] = user_id
+    session["google_access_token_exp"] = exp_utc.isoformat()
+
+    user_info = db.session.get(GoogleToken, user_id)
+    if user_info is None:
+        user_info = GoogleToken(google_sub=user_id, refresh_token=refresh_token, expires_at=exp_utc)
+        db.session.add(user_info)
+
+    else:
+        if refresh_token:
+            user_info.refresh_token = refresh_token
+        user_info.expires_at = exp_utc
+    db.session.commit()
+
+    # ...existing code...
+    return redirect(os.getenv("FRONTEND_ORIGIN", "http://localhost:5173") + "/")
+
+
+    
+    
 
     
 

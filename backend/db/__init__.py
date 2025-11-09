@@ -1,15 +1,22 @@
 from flask_sqlalchemy import SQLAlchemy
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
 
 db = SQLAlchemy()
 
 def init_db(app):
-    app.config['SQLALCHEMY_DATABASE_URI'] = (
-        f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-        f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-    )
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # 1) DATABASE_URL があれば優先（例: mysql+pymysql://...）
+    uri = os.getenv("DATABASE_URL")
+    if not uri:
+        # 2) もしくは個別項目から組み立て（MySQL を使うなら PyMySQL が必要）
+        if os.getenv("DB_USER"):
+            uri = (
+                f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
+                f"@{os.getenv('DB_HOST','127.0.0.1')}:{os.getenv('DB_PORT','3306')}/{os.getenv('DB_NAME')}"
+            )
+        else:
+            # 3) 何もなければまず SQLite で動かす
+            uri = "sqlite:///data.db"
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = uri
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.init_app(app)
