@@ -14,7 +14,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 
 def refresh_access_token(user_id):
-    token_url = "https://oauth2.googleapis.com/token"
+    token_url = os.getenv("TOKEN_URL")
     user_info = GoogleToken.query.get(user_id)
     if not user_info or not user_info.refresh_token:
         raise RuntimeError("No refresh_token. Re-consent needed.")
@@ -83,14 +83,15 @@ def get_valid_access_token():
 # redirect to Endpoint to initiate Google Oauth2 authentication
 @api_bp.get("/auth")
 def auth():
-    base_url = "https://accounts.google.com/o/oauth2/v2/auth"
+    base_url = os.getenv("OAUTH_URL")
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    scope = os.getenv("SCOPE")
     params = {
         "response_type": "code",
         "client_id": client_id,
         "redirect_uri": redirect_uri,
-        "scope": "openid email https://www.googleapis.com/auth/calendar.readonly", #将来的には.eventsにしてイベントの書き込みなども可能にするかもしれない
+        "scope": scope, #将来的には.eventsにしてイベントの書き込みなども可能にするかもしれない
         "access_type": "offline",
         "include_granted_scopes": "true",
         "state": "xyz123"  # 任意のCSRF対策用トークン
@@ -102,7 +103,7 @@ def auth():
 
 @api_bp.get("/oauth2callback")
 def authentication_callback():
-    token_url = "https://oauth2.googleapis.com/token"
+    token_url = os.getenv("TOKEN_URL")
     code = request.args.get("code")
     state = request.args.get("state")
     client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -128,9 +129,8 @@ def authentication_callback():
         current_app.logger.error(f"No access_token in token response: {token_response_data}")
         return jsonify({"error": "token_exchange_failed"}), 400
 
-    user_google_info = requests.get(
-        "https://openidconnect.googleapis.com/v1/userinfo",
-        headers = {"Authorization": f"Bearer {access_token}"}   
+    user_google_info_url = os.getenv("GOOGLE_USER_INFO_URL")
+    user_google_info = requests.get(user_google_info_url, headers = {"Authorization": f"Bearer {access_token}"}   
     ).json()
 
 
@@ -157,7 +157,7 @@ def authentication_callback():
     db.session.commit()
 
     # ...existing code...
-    return redirect(os.getenv("FRONTEND_ORIGIN", "http://localhost:5173") + "/")
+    return redirect(os.getenv("FRONTEND_ORIGIN") + "/")
 
 
     
