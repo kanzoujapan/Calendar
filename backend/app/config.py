@@ -6,7 +6,6 @@ class Config:
     SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-insecure")
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = False
-    SESSION_COOKIE_DOMAIN = "localhost"
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
