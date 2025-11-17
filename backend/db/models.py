@@ -1,13 +1,8 @@
 from . import db
-from datetime import datetime
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 
 class GoogleToken(db.Model):
     __tablename__ = "google_tokens"
-
-    # ここを主キーにする（get(user_id) が効くように）
-    google_sub   = db.Column(db.String(255), primary_key=True)
-    refresh_token = db.Column(db.String(2048))
-    expires_at    = db.Column(db.DateTime)
-
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at    = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    google_sub = db.Column(db.String(128), primary_key=True)
+    refresh_token = db.Column(db.String(1024), nullable=True)
+    expires_at = db.Column(TIMESTAMP(timezone=True), nullable=True)
